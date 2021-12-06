@@ -1,0 +1,291 @@
+import Vue from 'vue';
+import './../../common';
+import Form from './../../common/form';
+import VueFormWizard from 'vue-form-wizard';
+import Modal from 'bootstrap-vue';
+import {filter} from 'lodash';
+import {getRequestError} from "../../common/helpers";
+Vue.use(Modal);
+Vue.use(VueFormWizard);
+
+window['app'] = new Vue({
+    el: '#campaign-create',
+    components: {
+        'spinner-icon': require('./../../components/spinner-icon/spinner-icon').default,
+        'input-errors': require('./../../components/input-errors/input-errors').default,
+        'date-pick': require('./../../components/date-pick/date-pick').default
+    },
+    data: {
+        addCrmExportEmail: '',
+        adfCrmExportEmail: '',
+        agencySelected: null,
+        industrySelected : null,
+        availablePhoneNumbers: [],
+        availableCallSources: [],
+        clientPassThroughEmail: '',
+        dealershipSelected: null,
+        agencies: [],
+        industries: [],
+        callSources: [
+            {name: 'email', label: 'Email'},
+            {name: 'mailer', label: 'Mailer'},
+            {name: 'sms', label: 'SMS'}
+        ],
+        datePickInputClasses: {
+            class: 'form-control'
+        },
+        dealerships: [],
+        loading: false,
+        campaignForm: new Form({
+            agency: null,
+            industry_id : '',
+            text_to_value_message: '',
+            enable_text_to_value: false,
+            adf_crm_export: false,
+            adf_crm_export_email: [],
+            client_passthrough: false,
+            client_passthrough_email: [],
+            cloud_one_campaign_id: '',
+            facebook_campaign_id: '',
+            dealership: null,
+            end: null,
+            enable_call_center: false,
+            enable_facebook_campaign: false,
+            expires: null,
+            lead_alerts: false,
+            lead_alert_emails: [],
+            name: '',
+            order: null,
+            phone_number_ids: [],
+            service_dept: false,
+            service_dept_email: [],
+            sms_on_callback: false,
+            sms_on_callback_number: [],
+            start: null,
+            status: 'Active',
+            industry: '',
+            industrySelected : null
+        }),
+        campaignPhones: [],
+        leadAlertEmail: '',
+        loadingPhoneModal: false,
+        loadingPurchaseNumber: false,
+        phoneNumbers: [],
+        purchasePhoneNumberForm: new Form({
+            phone_number: null,
+            forward: '',
+            call_source_name: ''
+        }),
+        serviceDeptEmail: '',
+        searchPhoneNumberForm: new Form({
+            country: 'US',
+            inPostalCode: '',
+            contains: '',
+            areaCode: '',
+        }),
+        showAvailablePhoneNumbers: false,
+        smsOnCallbackNumber: '',
+        validation: [{
+            classes: 'asdf',
+            rule: /^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$/
+        }]
+    },
+    computed: {
+        campaign_has_mailer_phone: function () {
+            let hasMailerPhone = false;
+            this.phoneNumbers.forEach(phone => {
+                if (phone.call_source_name === 'mailer') {
+                    hasMailerPhone = true;
+                }
+            });
+            return hasMailerPhone;
+        },
+    },
+    mounted() {
+        this.agencies = window.agencies;
+        this.industries = window.industries;
+        this.dealerships = null;
+        this.updateCallSources();
+    },
+    methods: {
+        updateCallSources: function () {
+            this.availableCallSources = [];
+
+            let campaign_sources = _.map(this.phoneNumbers, 'call_source_name');
+            if (this.phoneNumbers.length == 0 || campaign_sources.length == 0) {
+                this.availableCallSources = this.callSources;
+                return;
+            }
+
+            _.map(this.callSources, (source, index) => {
+                if (campaign_sources.indexOf(source.name) < 0) {
+                    this.availableCallSources.push(source);
+                }
+            });
+        },
+        addFieldToAdditionalFeature: function (field, list) {
+            if (!this[field]) return;
+            list.push(this[field]);
+            this[field] = null;
+        },
+        clearError: function (form, field) {
+            form.errors.clear(field);
+            if(field == 'industry') {
+                this.dealerships = null;
+            }
+        },
+        closeModal: function (modalRef) {
+            this.$refs[modalRef].hide();
+        },
+        formatDate: function (date) {
+            return date.toISOString();
+        },
+        purchasePhoneNumber: function () {
+            let invalid = false;
+            this.purchasePhoneNumberForm.errors.clear();
+            ['phone_number', 'call_source_name'].forEach(field => {
+                if (!this.purchasePhoneNumberForm[field]) {
+                    this.purchasePhoneNumberForm.errors.add(field, 'This field is required.');
+                    invalid = true;
+                }
+            });
+            if (invalid) return;
+            this.loadingPurchaseNumber = true;
+            this.purchasePhoneNumberForm
+                .post(window.provisionPhoneUrl)
+                .then((response) => {
+                    this.loadingPurchaseNumber = false;
+                    this.phoneNumbers.push(response);
+                    this.campaignForm.phone_number_ids.push(response.id);
+                    this.updateCallSources();
+                    this.purchasePhoneNumberForm.reset();
+                    this.showAvailablePhoneNumbers = false;
+                    this.closeModal('addPhoneModalRef');
+                })
+                .catch((error) => {
+                    this.loadingPurchaseNumber = false;
+                    window.PmEvent.fire('errors.api', 'Unable to process your request.');
+                });
+        },
+        removeAdditionalFeature: function (index, list) {
+          if (list[index]) {
+              list.splice(index, 1);
+          }
+        },
+        getCallSourceName: function (value) {
+            let displayValue = _.filter(this.callSources, {name: value});
+            if (displayValue.length == 1) {
+                return displayValue[0].label;
+            }
+            return '';
+        },
+        saveCampaign: function () {
+            if (this.campaignForm.enable_call_center && !this.campaignForm.cloud_one_campaign_id) {
+                this.campaignForm.errors.add('cloud_one_campaign_id', 'CloudOne Campaign ID is required.');
+                return;
+            }
+            this.campaignForm.errors.clear('cloud_one_campaign_id');
+
+            if (this.campaignForm.enable_facebook_campaign && !this.campaignForm.facebook_campaign_id) {
+                this.campaignForm.errors.add('facebook_campaign_id', 'Facebook Campaign ID is required.');
+                return;
+            }
+            this.campaignForm.errors.clear('facebook_campaign_id');
+
+            this.loading = true;
+            this.campaignForm.agency = this.agencySelected.id;
+            this.campaignForm.dealership = this.dealershipSelected.id;
+            this.campaignForm.industry_id = this.industrySelected.id;
+            this.campaignForm
+                .post(window.saveCampaignUrl)
+                .then(() => {
+                    this.loading = false;
+                    this.$swal({
+                        title: 'Campaign Created!',
+                        type: 'success',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        window.location.replace(window.campaignIndexUrl);
+                    });
+                })
+                .catch(e => {
+                    window.PmEvent.fire('errors.api', getRequestError(e));
+                    this.loading = false;
+                });
+        },
+        searchPhones() {
+            let invalid = false;
+            this.searchPhoneNumberForm.errors.clear();
+            this.loadingPhoneModal = true;
+            this.showAvailablePhoneNumbers = false;
+            this.searchPhoneNumberForm
+                .post(window.searchPhoneUrl)
+                .then(response => {
+                    let modifiedNumbers = this.convertPhoneNumbersToOptions(response.numbers);
+                    this.availablePhoneNumbers = modifiedNumbers;
+                    this.showAvailablePhoneNumbers = true;
+                    this.loadingPhoneModal = false;
+                }, () => {
+                    window.PmEvent.fire('errors.api', 'Unable to get phone numbers.');
+                    this.showAvailablePhoneNumbers = true;
+                    this.loadingPhoneModal = false;
+                });
+        },
+        convertPhoneNumbersToOptions: function (numbers) {
+            numbers.forEach((number) => {
+                number.label = number.phone + ' - ' + number.location;
+                number.value = number.phoneNumber;
+                delete number.location;
+                delete number.phone;
+                delete number.phoneNumber;
+                delete number.zip;
+            });
+            return numbers;
+        },
+        validateAccountsTab: function () {
+            let valid = true;
+            this.campaignForm.errors.clear();
+            if (!this.agencySelected) {
+                valid = false;
+                this.campaignForm.errors.add('agency', 'This field is required.');
+            }
+            if (!this.dealershipSelected) {
+                valid = false;
+                this.campaignForm.errors.add('dealership', 'This field is required.');
+            }
+            if (!this.industrySelected) {
+                valid = false;
+                this.campaignForm.errors.add('industry', 'This field is required.');
+            }
+            return valid;
+        },
+        validateBasicTab: function () {
+            let valid = true;
+            this.campaignForm.errors.clear();
+            ['name', 'order', 'status', 'start', 'end'].forEach(field => {
+                if (!this.campaignForm[field]) {
+                    this.campaignForm.errors.add(field, 'This field is required.');
+                    valid = false;
+                }
+            });
+            return valid;
+        },
+        getSelectedCompany() {
+            this.dealershipSelected = null;
+            this.loading = true;
+            if(this.industrySelected!=null){
+                this.campaignForm.industry_id = this.industrySelected.id;
+                this.campaignForm
+                    .get(window.getCompaniesByIndustry)
+                    .then(response => {
+                        // console.log(response);
+                        this.dealerships = response;
+                    })
+                    .catch(e => {
+                        console.log(error);
+                        window.PmEvent.fire('errors.api', "Unable to get companies");
+                    });
+            }
+        },
+    }
+});

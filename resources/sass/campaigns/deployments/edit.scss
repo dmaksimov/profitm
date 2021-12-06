@@ -1,0 +1,94 @@
+@import './../../common/index';
+@import './../base';
+@import "~bootstrap/scss/tables";
+@import './../../components/date-pick';
+@import './../../components/spinner-icon';
+@import "~vue-form-wizard/dist/vue-form-wizard.min.css";
+@import './../../components/resumable';
+
+#deployments-edit {
+
+    .image-preview {
+        overflow: hidden;
+        padding: 15px;
+        position: relative;
+        height: 100%;
+        background-color: #fafafa;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #ddd;
+        img {
+            max-width: 100%;
+        }
+        button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        &--loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    }
+
+    .mx-datepicker {
+        width: 100%;
+    }
+
+    .mx-calendar-icon {
+        height: auto;
+    }
+
+    .edit-container {
+        position: relative;
+        background-color: #fff;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 2rem 1rem;
+        border: 2px solid #ced4da;
+    }
+
+    .total{
+        &-value {
+            font-size: 4rem;
+            line-height: 1em;
+        }
+    }
+
+    .table-loader-spinner {
+
+    }
+
+    .vue-form-wizard {
+        .wizard-icon-circle, .stepTitle {
+            color: $brand-purple;
+        }
+
+        a.disabled {
+            .wizard-icon-circle {
+                border-color: rgba(0, 0, 0, .2);
+                color: rgba(0, 0, 0, .2);
+            }
+
+            .stepTitle {
+                color: rgba(0, 0, 0, .2);
+            }
+        }
+
+        .wizard-btn {
+            border-radius: 5px;
+            font-size: 0.9rem;
+            background-color: $brand-purple;
+            color: #fff;
+        }
+    }
+}
